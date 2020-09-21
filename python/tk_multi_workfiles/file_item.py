@@ -13,8 +13,15 @@ from tank_vendor import six
 from sgtk.platform.qt import QtGui
 
 import os
+import re
 from datetime import datetime, timedelta
 import copy
+
+# a regular expression used to extract the version number from the file.
+# this implementation assumes the version number is of the form 'v###'
+# coming just before an optional extension in the file/folder name and just
+# after a '.', '_', or '-'.
+VERSION_REGEX = re.compile(r"(.*)([._-])v(\d+)\.?([^.]+)?$", re.IGNORECASE)
 
 
 class FileItem(object):
@@ -151,9 +158,10 @@ class FileItem(object):
         :returns:   The name that identifies this file.  This is either the name specified in
                     the details dictionary or if not specified then the file base name
         """
-        n = self._details.get("name") or self._publish_details.get("name")
-        if not n and self._path:
-            n = os.path.basename(self._path)
+        # n = self._details.get("name") or self._publish_details.get("name")
+        # if not n and self._path:
+        # n = os.path.basename(self._path)
+        n = self.get_display_name(self._path)
         return n
 
     @property
@@ -749,3 +757,70 @@ class FileItem(object):
         return ["th", "st", "nd", "rd"][
             day % 10 if not 11 <= day <= 13 and day % 10 < 4 else 0
         ]
+
+    def get_display_name(self, path):
+        """
+        """
+
+        path_info = get_file_path_components(path)
+        filename = path_info["filename"]
+
+        version_pattern_match = re.search(VERSION_REGEX, filename)
+
+        if version_pattern_match:
+            # found a version number, use the other groups to remove it
+            prefix = version_pattern_match.group(1)
+            extension = version_pattern_match.group(4) or ""
+            if extension:
+                publish_name = "%s.%s" % (prefix, extension)
+            else:
+                publish_name = prefix
+        else:
+            publish_name = filename
+
+        return publish_name
+
+
+def get_file_path_components(path):
+    """
+    Convenience method for determining file components for a given path.
+    :param str path: The path to the file to componentize.
+    Returns file path components in the form::
+        # path="/path/to/the/file/my_file.v001.ext"
+        {
+            "path": "/path/to/the/file/my_file.v001.ext",
+            "folder": "/path/to/the/file" ,
+            "filename": "my_file.v001.ext",
+            "extension": "ext",
+        }
+        # path="/path/to/the/folder"
+        {
+            "path": "/path/to/the/folder",
+            "folder": "/path/to/the" ,
+            "filename": "folder",
+            "extension": None,
+        }
+    """
+
+    # get the path in a normalized state. no trailing separator, separators are
+    # appropriate for current os, no double separators, etc.
+    path = sgtk.util.ShotgunPath.normalize(path)
+
+    # break it up into the major components
+    (folder, filename) = os.path.split(path)
+
+    if os.path.isdir(path):
+        # folder
+        extension = None
+    else:
+        # file. extract the extension and remove the "."
+        (_, extension) = os.path.splitext(filename)
+        if extension:
+            extension = extension.lstrip(".")
+        else:
+            # prevent extension = ""
+            extension = None
+
+    file_info = dict(path=path, folder=folder, filename=filename, extension=extension,)
+
+    return file_info
