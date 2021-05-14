@@ -69,7 +69,8 @@ class FileItem(object):
         ignore_fields = ignore_fields or []
         # always want to ignore 'version' and 'extension' if they are present in the fields
         # dictionary
-        ignore_fields += ["version", "extension"]
+        # ignore_fields += ["version", "extension"]
+        ignore_fields += ["version"]
 
         # populate the file key from the fields passed in that are included in
         # the template, skipping the ignore fields:
